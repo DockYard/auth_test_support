@@ -3,6 +3,9 @@ defmodule AuthTestSupport do
   A collection of common funcitonality to use in your Phoenix test suites.
 
   `use AuthTestSupport` in your test files.
+
+  `use` is necessary for `sign_in` and it will import the remaining functions. If you'd
+  like to use another of the other functions in isolation feel free to import them specifically.
   """
   @api_actions [:index, :show, :delete, :update, :create]
 
@@ -23,7 +26,20 @@ defmodule AuthTestSupport do
   1. assert that `:account_id` value in the session is not `nil` and is equal to the `account`'s primary key value
   2. assert that `:account_type` value in the sesion is not `nil` and is equal to the `account`'s struct
   """
-  def assert_authenticated_as(conn, account)
+  def assert_authenticated_as(conn, account) do
+    module = account.__struct__
+    [primary_key] = module.__schema__(:primary_key)
+    primary_key_value = Map.get(account, primary_key)
+
+    account_id = Plug.Conn.get_session(conn, :account_id)
+    account_type = Plug.Conn.get_session(conn, :account_type)
+
+    ExUnit.Assertions.assert account_id, "expected an account_id to be set"
+    ExUnit.Assertions.assert account_id == primary_key_value, "expected the authenticated account to have a primary key value of: #{primary_key_value}"
+    ExUnit.Assertions.assert account_type, "expected an account_type to be set"
+    ExUnit.Assertions.assert account_type == module, "expected the authenticated account to be of type: #{inspect module}"
+  end
+
   defmacro __using__(_) do
     quote do
       import AuthTestSupport
@@ -37,20 +53,6 @@ defmodule AuthTestSupport do
         do: post(conn, session_path(conn, :create, creds))
 
       defoverridable [sign_in: 2]
-
-      def assert_authenticated_as(conn, account) do
-        module = account.__struct__
-        [primary_key] = module.__schema__(:primary_key)
-        primary_key_value = Map.get(account, primary_key)
-
-        account_id = Plug.Conn.get_session(conn, :account_id)
-        account_type = Plug.Conn.get_session(conn, :account_type)
-
-        assert account_id, "expected an account_id to be set"
-        assert account_id == primary_key_value, "expected the authenticated account to have a primary key value of: #{primary_key_value}"
-        assert account_type, "expected an account_type to be set"
-        assert account_type == module, "expected the authenticated account to be of type: #{inspect module}"
-      end
     end
   end
 
