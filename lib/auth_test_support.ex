@@ -9,14 +9,24 @@ defmodule AuthTestSupport do
   """
   @api_actions [:index, :show, :delete, :update, :create]
 
-  @doc """
+  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:sign_in, 2}, (quote do: [conn, credentials]),
+  """
   Sign in to the session
 
   This function assumes that the session creation path is `session_path` and is using `post`.
 
   Feel free to override this function.
+  """)
+
+  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate_as, 2}, (quote do: [conn, account]),
   """
-  def sign_in(conn, creds)
+  Authenticate a `conn` for a specific account
+
+  Will setup the session on a `conn` object for a given `account`.
+
+  This function is different than `sign_in/2` as it will simply set the session on the `conn`
+  whereas `sign_in/2` will step through the process of making the application API requests.
+  """)
 
   @doc """
   Assert that the current connection is authenticated as a given account
@@ -38,23 +48,8 @@ defmodule AuthTestSupport do
     ExUnit.Assertions.assert session_account_type == account_type, "expected the authenticated account to be of type: #{inspect account_type}"
   end
 
-  @doc """
-  Authenticate a `conn` for a specific account
-
-  Will setup the session on a `conn` object for a given `account`.
-
-  This function is different than `sign_in/2` as it will simply set the session on the `conn`
-  whereas `sign_in/2` will step through the process of making the application API requests.
-  """
-  def authenticate_as(conn, account) do
-    {account_id, account_type} = get_account_info(account)
-
-    conn
-    |> Plug.Conn.put_session(:account_id, account_id)
-    |> Plug.Conn.put_session(:account_type, account_type)
-  end
-
-  defp get_account_info(account) do
+  @doc false
+  def get_account_info(account) do
     module = account.__struct__
     [primary_key] = module.__schema__(:primary_key)
     primary_key_value = Map.get(account, primary_key)
@@ -71,10 +66,25 @@ defmodule AuthTestSupport do
 
   defmacro __before_compile__(_) do
     quote do
+      @doc false
       def sign_in(conn, creds),
-        do: post(conn, session_path(conn, :create, creds))
+        do: Phoenix.ConnTest.post(conn, session_path(conn, :create, creds))
 
       defoverridable [sign_in: 2]
+
+      @doc false
+      def authenticate_as(conn, account, router, pipelines \\ [:browser])
+      def authenticate_as(conn, account, router, pipeline) when is_atom(pipeline),
+        do: authenticate_as(conn, account, router, [pipeline])
+      def authenticate_as(conn, account, router, pipelines) when is_list(pipelines) do
+        {account_id, account_type} = AuthTestSupport.get_account_info(account)
+
+        conn
+        |> Phoenix.ConnTest.bypass_through(router, List.wrap(pipelines))
+        |> Phoenix.ConnTest.get("/")
+        |> Plug.Conn.put_session(:account_id, account_id)
+        |> Plug.Conn.put_session(:account_type, account_type)
+      end
     end
   end
 

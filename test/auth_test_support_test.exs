@@ -1,12 +1,10 @@
 defmodule AuthTestSupportTest do
   use ExUnit.Case
+
+  use Phoenix.ConnTest
+  @endpoint Endpoint
+  import Router.Helpers
   use AuthTestSupport
-
-  defp post(conn, _path),
-    do: conn
-
-  defp session_path(conn, _action, _params),
-    do: conn
 
   setup_all do
     Endpoint.start_link()
@@ -66,10 +64,24 @@ defmodule AuthTestSupportTest do
     assert_authenticated_as(conn, user)
   end
 
-  test "authorize_as will authorize a session properly", %{conn: conn, user: user}  do
+  test "authorize_as will authorize a session properly through the default pipeline", %{conn: conn, user: user}  do
     user = Map.put(user, :id, 1)
 
-    authenticate_as(conn, user)
+    authenticate_as(conn, user, Router)
+    |> assert_authenticated_as(user)
+  end
+
+  test "authorize_as will authorize a session properly through a given pipeline", %{conn: conn, user: user} do
+    user = Map.put(user, :id, 1)
+
+    authenticate_as(conn, user, Router, :api)
+    |> assert_authenticated_as(user)
+  end
+
+  test "authorize_as will authorize a session properly through the given pipelines", %{conn: conn, user: user} do
+    user = Map.put(user, :id, 1)
+
+    authenticate_as(conn, user, Router, [:other, :api])
     |> assert_authenticated_as(user)
   end
 
@@ -79,9 +91,6 @@ defmodule AuthTestSupportTest do
   Because this macro generates a test the best way to actually test this is to ensure
   the test doesn't raise with green paths
   """
-
-  @endpoint Endpoint
-  import Router.Helpers
 
   require_authorization :profile_path
   require_authorization :profile_path, only: [:index, :create]

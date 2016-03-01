@@ -17,9 +17,27 @@ end
 defmodule Router do
   use Phoenix.Router
 
+  pipeline :browser do
+    plug :fetch_session
+  end
+
+  pipeline :api do
+    plug :fetch_session
+  end
+
+  pipeline :other do
+  end
+
+  resources "/sessions", SessionController, only: [:create]
   resources "/profiles", ProfileController
   resources "/foos", FooController, only: [:show]
   resources "/bars", BarController, only: [:index]
+end
+
+defmodule SessionController do
+  use Phoenix.Controller
+
+  def create(conn, _params), do: resp(conn, 200, "")
 end
 
 defmodule ProfileController do
