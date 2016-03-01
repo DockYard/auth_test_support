@@ -17,6 +17,7 @@ defmodule AuthTestSupport do
   Feel free to override this function.
   """
   def sign_in(conn, creds)
+  def sign_in(nil, nil), do: nil
 
   @doc """
   Assert that the current connection is authenticated as a given account
@@ -27,17 +28,39 @@ defmodule AuthTestSupport do
   2. assert that `:account_type` value in the sesion is not `nil` and is equal to the `account`'s struct
   """
   def assert_authenticated_as(conn, account) do
+    {account_id, account_type} = get_account_info(account)
+
+    session_account_id = Plug.Conn.get_session(conn, :account_id)
+    session_account_type = Plug.Conn.get_session(conn, :account_type)
+
+    ExUnit.Assertions.assert session_account_id, "expected an account_id to be set"
+    ExUnit.Assertions.assert session_account_id == account_id, "expected the authenticated account to have a primary key value of: #{account_id}"
+    ExUnit.Assertions.assert session_account_type, "expected an account_type to be set"
+    ExUnit.Assertions.assert session_account_type == account_type, "expected the authenticated account to be of type: #{inspect account_type}"
+  end
+
+  @doc """
+  Authenticate a `conn` for a specific account
+
+  Will setup the session on a `conn` object for a given `account`.
+
+  This function is different than `sign_in/2` as it will simply set the session on the `conn`
+  whereas `sign_in/2` will step through the process of making the application API requests.
+  """
+  def authenticate_as(conn, account) do
+    {account_id, account_type} = get_account_info(account)
+
+    conn
+    |> Plug.Conn.put_session(:account_id, account_id)
+    |> Plug.Conn.put_session(:account_type, account_type)
+  end
+
+  defp get_account_info(account) do
     module = account.__struct__
     [primary_key] = module.__schema__(:primary_key)
     primary_key_value = Map.get(account, primary_key)
 
-    account_id = Plug.Conn.get_session(conn, :account_id)
-    account_type = Plug.Conn.get_session(conn, :account_type)
-
-    ExUnit.Assertions.assert account_id, "expected an account_id to be set"
-    ExUnit.Assertions.assert account_id == primary_key_value, "expected the authenticated account to have a primary key value of: #{primary_key_value}"
-    ExUnit.Assertions.assert account_type, "expected an account_type to be set"
-    ExUnit.Assertions.assert account_type == module, "expected the authenticated account to be of type: #{inspect module}"
+    {primary_key_value, module}
   end
 
   defmacro __using__(_) do
@@ -111,13 +134,19 @@ defmodule AuthTestSupport do
 
     quote do
       test "require authentication for #{Enum.join(unquote(role_text), ", ")} on #{Enum.join(unquote(action_text), ", ")}", %{conn: conn} do
+        path_helper_full = inspect(unquote({:&, [], [{:/, [], [{path_helper, [], nil}, 3]}]}))
+        path_helper_module =
+          Regex.run(~r/\&([\w|\.]+)?\.\w+\/\d+/, path_helper_full)
+          |> List.last()
+          |> Code.eval_string()
+          |> elem(0)
 
         for role <- unquote(role_keys) do
           for action <- unquote(action_keys) do
             {methods, params} = case action do
               :show -> {[:get], [0]}
               :delete -> {[:delete], [0]}
-              :create -> {[:post], [unquote(actions)[action] || %{}]}
+              :create -> {[:post], [nil, unquote(actions)[action] || %{}]}
               :index -> {[:get], []}
               :update -> {[:put, :patch], [0, unquote(actions)[action] || %{}]}
             end
@@ -128,10 +157,11 @@ defmodule AuthTestSupport do
             end
 
             for method <- methods do
-              path = cond do
-                action in [:show, :delete, :update] -> unquote(path_helper)(conn, action, List.first(params))
-                action in [:index, :create] -> unquote(path_helper)(conn, action)
-              end
+              args =
+                [conn, action, List.first(params)]
+                |> Enum.reject(&is_nil/1)
+
+              path = apply(path_helper_module, unquote(path_helper), args)
 
               {conn, message} = cond do
                 action in [:show, :delete, :index] ->

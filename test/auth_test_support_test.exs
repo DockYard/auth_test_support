@@ -24,7 +24,7 @@ defmodule AuthTestSupportTest do
 
     user = struct(User, %{})
     admin = struct(Admin, %{})
-  
+
     {:ok, conn: conn, user: user, admin: admin}
   end
 
@@ -48,7 +48,7 @@ defmodule AuthTestSupportTest do
       conn
       |> Plug.Conn.put_session(:account_id, 1)
       |> Plug.Conn.put_session(:account_type, User)
-    
+
     admin = Map.put(admin, :id, 1)
 
     assert_raise ExUnit.AssertionError, "expected the authenticated account to be of type: Admin", fn ->
@@ -61,9 +61,16 @@ defmodule AuthTestSupportTest do
       conn
       |> Plug.Conn.put_session(:account_id, 1)
       |> Plug.Conn.put_session(:account_type, User)
-    
+
     user = Map.put(user, :id, 1)
     assert_authenticated_as(conn, user)
+  end
+
+  test "authorize_as will authorize a session properly", %{conn: conn, user: user}  do
+    user = Map.put(user, :id, 1)
+
+    authenticate_as(conn, user)
+    |> assert_authenticated_as(user)
   end
 
   @doc """
@@ -82,6 +89,8 @@ defmodule AuthTestSupportTest do
   require_authorization :profile_path, roles: [:no_auth, :auth], only: [:index, :create]
   require_authorization :profile_path, only: [:index, create: %{foo: "bar"}]
   require_authorization :profile_path, roles: [:no_auth, auth: &auth_conn/1]
+  require_authorization :foo_path, only: [:show]
+  require_authorization :bar_path, only: [:index]
 
   defp auth_conn(conn), do: conn
 end
