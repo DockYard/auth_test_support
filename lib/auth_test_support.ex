@@ -17,7 +17,6 @@ defmodule AuthTestSupport do
   Feel free to override this function.
   """
   def sign_in(conn, creds)
-  def sign_in(nil, nil), do: nil
 
   @doc """
   Assert that the current connection is authenticated as a given account
