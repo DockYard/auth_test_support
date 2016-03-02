@@ -4,12 +4,12 @@ defmodule AuthTestSupport do
 
   `use AuthTestSupport` in your test files.
 
-  `use` is necessary for `sign_in` and it will import the remaining functions. If you'd
+  `use` is necessary for `authenticate` and it will import the remaining functions. If you'd
   like to use another of the other functions in isolation feel free to import them specifically.
   """
   @api_actions [:index, :show, :delete, :update, :create]
 
-  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:sign_in, 2}, (quote do: [conn, credentials]),
+  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate, 2}, (quote do: [conn, credentials]),
   """
   Sign in to the session
 
@@ -17,61 +17,6 @@ defmodule AuthTestSupport do
 
   Feel free to override this function.
   """)
-
-  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate_as, 2}, (quote do: [conn, account]),
-  """
-  Authenticate a `conn` for a specific account
-
-  Will setup the session on a `conn` object for a given `account`.
-
-  This function is different than `sign_in/2` as it will simply set the session on the `conn`
-  whereas `sign_in/2` will step through the process of making the application API requests.
-  """)
-
-  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate_as, 3}, (quote do: [conn, account, endpoint]),
-  """
-  Authenticate a `conn` for a specific account through a custom endpoint.
-
-  Similar to `authenticate_as/2` but you can controll which endpoint the authentication
-  is run through.
-  """)
-
-  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate_as, 4}, (quote do: [conn, account, router, pipelines]),
-  """
-  Authenticate a `conn` for a specific account through a pipeline
-
-  Similar to `authenticate_as/2` but you can controll which router and pipeline the authentication
-  is run through.
-  """)
-
-  @doc """
-  Assert that the current connection is authenticated as a given account
-
-  Will run the following assertions:
-
-  1. assert that `:account_id` value in the session is not `nil` and is equal to the `account`'s primary key value
-  2. assert that `:account_type` value in the sesion is not `nil` and is equal to the `account`'s struct
-  """
-  def assert_authenticated_as(conn, account) do
-    {account_id, account_type} = get_account_info(account)
-
-    session_account_id = Plug.Conn.get_session(conn, :account_id)
-    session_account_type = Plug.Conn.get_session(conn, :account_type)
-
-    ExUnit.Assertions.assert session_account_id, "expected an account_id to be set"
-    ExUnit.Assertions.assert session_account_id == account_id, "expected the authenticated account to have a primary key value of: #{account_id}"
-    ExUnit.Assertions.assert session_account_type, "expected an account_type to be set"
-    ExUnit.Assertions.assert session_account_type == account_type, "expected the authenticated account to be of type: #{inspect account_type}"
-  end
-
-  @doc false
-  def get_account_info(account) do
-    module = account.__struct__
-    [primary_key] = module.__schema__(:primary_key)
-    primary_key_value = Map.get(account, primary_key)
-
-    {primary_key_value, module}
-  end
 
   defmacro __using__(_) do
     quote do
@@ -83,38 +28,61 @@ defmodule AuthTestSupport do
   defmacro __before_compile__(_) do
     quote do
       @doc false
-      def sign_in(conn, creds),
+      def authenticate(conn, creds),
         do: Phoenix.ConnTest.post(conn, session_path(conn, :create, creds))
 
-      defoverridable [sign_in: 2]
-
-      @doc false
-      def authenticate_as(conn, account),
-        do: authenticate_as(conn, account, @endpoint)
-      @doc false
-      def authenticate_as(conn, account, endpoint) do
-        {account_id, account_type} = AuthTestSupport.get_account_info(account)
-
-        conn
-        |> Phoenix.ConnTest.bypass_through()
-        |> endpoint.call(endpoint.init([]))
-        |> Phoenix.ConnTest.get("/")
-        |> Plug.Conn.fetch_session()
-        |> Plug.Conn.put_session(:account_id, account_id)
-        |> Plug.Conn.put_session(:account_type, account_type)
-      end
-      def authenticate_as(conn, account, router, pipeline) when is_atom(pipeline),
-        do: authenticate_as(conn, account, router, [pipeline])
-      def authenticate_as(conn, account, router, pipelines) when is_list(pipelines) do
-        {account_id, account_type} = AuthTestSupport.get_account_info(account)
-
-        conn
-        |> Phoenix.ConnTest.bypass_through(router, pipelines)
-        |> Phoenix.ConnTest.get("/")
-        |> Plug.Conn.put_session(:account_id, account_id)
-        |> Plug.Conn.put_session(:account_type, account_type)
-      end
+      defoverridable [authenticate: 2]
     end
+  end
+
+  @doc """
+  Assert that the current connection is authenticated as a given account
+
+  Will run the following assertions:
+
+  1. assert that `:account_id` value in the session is not `nil` and is equal to the `account`'s primary key value
+  2. assert that `:account_type` value in the sesion is not `nil` and is equal to the `account`'s struct
+
+  The original `conn` will be returned.
+  """
+  def assert_authorized_as(%Plug.Conn{assigns: %{account: assigned_account}} = conn, account) do
+    ExUnit.Assertions.assert assigned_account == account, "expected the account to match the assigned account in the session"
+    conn
+  end
+  def assert_authorized_as(conn, account) do
+    {account_id, account_type} = get_account_info(account)
+
+    session_account_id = Plug.Conn.get_session(conn, :account_id)
+    session_account_type = Plug.Conn.get_session(conn, :account_type)
+
+    ExUnit.Assertions.assert session_account_id, "expected an account_id to be set"
+    ExUnit.Assertions.assert session_account_id == account_id, "expected the authenticated account to have a primary key value of: #{account_id}"
+    ExUnit.Assertions.assert session_account_type, "expected an account_type to be set"
+    ExUnit.Assertions.assert session_account_type == account_type, "expected the authenticated account to be of type: #{inspect account_type}"
+
+    conn
+  end
+
+  @doc """
+  Authorizes a connection with an account
+
+  Equivalent to running:
+
+      Plug.Conn.assign(conn, :account, account)
+
+  This function differs from `authentication_as/2` as that will run the actual authentication whereas this function
+  simply assigns to the `conn`. The database is not hit, no encryption checks are run.
+  """
+  def authorize_as(conn, account),
+    do: Plug.Conn.assign(conn, :account, account)
+
+  @doc false
+  def get_account_info(account) do
+    module = account.__struct__
+    [primary_key] = module.__schema__(:primary_key)
+    primary_key_value = Map.get(account, primary_key)
+
+    {primary_key_value, module}
   end
 
   @doc """
@@ -133,7 +101,7 @@ defmodule AuthTestSupport do
       require_authorization :profile_path, roles: [:no_auth, auth: &auth_conn/1]
 
       defp auth_conn(conn) do
-        sign_in(conn, username: "user@example.com", password: "password")
+        authenticate(conn, username: "user@example.com", password: "password")
       end
 
       require_authorization :profile_path, only: [create: %{foo: "bar"}]
