@@ -11,7 +11,7 @@ defmodule AuthTestSupport do
 
   Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate, 2}, (quote do: [conn, credentials]),
   """
-  Sign in to the session
+  Authenticate the session with the given credentials
 
   This function assumes that the session creation path is `session_path` and is using `post`.
 
