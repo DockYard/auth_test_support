@@ -3,7 +3,7 @@
 A collection of common authentication / authorization test support
 function.
 
-[![Build Status](https://secure.travis-ci.org/DockYard/elixir-auth_test_support.svg?branch=master)](http://travis-ci.org/DockYard/elixir-auth_test_support)
+[![Build Status](https://secure.travis-ci.org/DockYard/auth_test_support.svg?branch=master)](http://travis-ci.org/DockYard/auth_test_support)
 
 ## Installation ##
 
