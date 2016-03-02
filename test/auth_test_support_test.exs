@@ -23,7 +23,7 @@ defmodule AuthTestSupportTest do
     {:ok, conn: conn, user: user, admin: admin}
   end
 
-  test "assert_authenticated_as when not authenticated raises on missing account_id value", %{conn: conn, user: user} do
+  test "assert_authorized_as when not authenticated raises on missing account_id value", %{conn: conn, user: user} do
     conn =
       conn
       |> Phoenix.ConnTest.bypass_through()
@@ -31,11 +31,11 @@ defmodule AuthTestSupportTest do
       |> Plug.Conn.fetch_session()
 
     assert_raise ExUnit.AssertionError, "expected an account_id to be set", fn ->
-      assert_authenticated_as(conn, user)
+      assert_authorized_as(conn, user)
     end
   end
 
-  test "assert_authenticated_as when not authenticated raises when account_id mismatch", %{conn: conn, user: user} do
+  test "assert_authorized_as when not authenticated raises when account_id mismatch", %{conn: conn, user: user} do
     conn =
       conn
       |> Phoenix.ConnTest.bypass_through()
@@ -46,11 +46,11 @@ defmodule AuthTestSupportTest do
     user = Map.put(user, :id, 2)
 
     assert_raise ExUnit.AssertionError, "expected the authenticated account to have a primary key value of: 2", fn ->
-      assert_authenticated_as(conn, user)
+      assert_authorized_as(conn, user)
     end 
   end
 
-  test "assert_authenticated_as when not authenticated raises when account_type mismatch", %{conn: conn, admin: admin} do
+  test "assert_authorized_as when not authenticated raises when account_type mismatch", %{conn: conn, admin: admin} do
     conn =
       conn
       |> Phoenix.ConnTest.bypass_through()
@@ -62,11 +62,11 @@ defmodule AuthTestSupportTest do
     admin = Map.put(admin, :id, 1)
 
     assert_raise ExUnit.AssertionError, "expected the authenticated account to be of type: Admin", fn ->
-      assert_authenticated_as(conn, admin)
+      assert_authorized_as(conn, admin)
     end
   end
 
-  test "assert_authenticated_as does not raise when all conditions are met", %{conn: conn, user: user} do
+  test "assert_authorized_as does not raise when all conditions are met", %{conn: conn, user: user} do
     conn =
       conn
       |> Phoenix.ConnTest.bypass_through()
@@ -76,35 +76,35 @@ defmodule AuthTestSupportTest do
       |> Plug.Conn.put_session(:account_type, User)
 
     user = Map.put(user, :id, 1)
-    assert_authenticated_as(conn, user)
+    assert_authorized_as(conn, user)
   end
 
-  test "authenticate_as will authenticate a session properly", %{conn: conn, user: user}  do
-    user = Map.put(user, :id, 1)
-
-    authenticate_as(conn, user)
-    |> assert_authenticated_as(user)
+  test "assert_authorized_as will not raise when account is present in `conn.assigns`", %{conn: conn, user: user} do
+    conn
+    |> Plug.Conn.assign(:account, user)
+    |> assert_authorized_as(user)
   end
 
-  test "authenticate_as will authenticate with a specific endpoing", %{conn: conn, user: user}  do
-    user = Map.put(user, :id, 1)
-
-    authenticate_as(conn, user, @endpoint)
-    |> assert_authenticated_as(user)
+  test "assert_authorized_as will raise when account is present in `conn.assigns` but doesn't match the challenge account", %{conn: conn, user: user} do
+    assert_raise ExUnit.AssertionError, "expected the account to match the assigned account in the session", fn ->
+      conn
+      |> Plug.Conn.assign(:account, %{})
+      |> assert_authorized_as(user)
+    end
   end
 
-  test "authenticate_as will authenticate a session properly through a given pipeline", %{conn: conn, user: user} do
-    user = Map.put(user, :id, 1)
+  test "assert_authorized_as will return the original `conn`", %{conn: conn, user: user} do
+    conn = Plug.Conn.assign(conn, :account, user)
 
-    authenticate_as(conn, user, Router, :api)
-    |> assert_authenticated_as(user)
+    result = assert_authorized_as(conn, user)
+
+    assert result == conn
   end
 
-  test "authenticate_as will authenticate a session properly through the given pipelines", %{conn: conn, user: user} do
-    user = Map.put(user, :id, 1)
-
-    authenticate_as(conn, user, Router, [:other, :api])
-    |> assert_authenticated_as(user)
+  test "authorize_as will authenticate with a specific account", %{conn: conn, user: user}  do
+    conn
+    |> authorize_as(user)
+    |> assert_authorized_as(user)
   end
 
   @doc """
