@@ -14,11 +14,8 @@ defmodule AuthTestSupportTest do
   end
 
   setup do
-    opts = Plug.Session.init(store: :cookie, key: "foobar", signing_salt: "foobar")
     conn =
-      Phoenix.ConnTest.conn()
-      |> Plug.Session.call(opts) 
-      |> Plug.Conn.fetch_session()
+      Phoenix.ConnTest.conn(:get, "/")
 
     user = struct(User, %{})
     admin = struct(Admin, %{})
@@ -27,13 +24,25 @@ defmodule AuthTestSupportTest do
   end
 
   test "assert_authenticated_as when not authenticated raises on missing account_id value", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+
     assert_raise ExUnit.AssertionError, "expected an account_id to be set", fn ->
       assert_authenticated_as(conn, user)
     end
   end
 
   test "assert_authenticated_as when not authenticated raises when account_id mismatch", %{conn: conn, user: user} do
-    conn = Plug.Conn.put_session(conn, :account_id, 1)
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.put_session(:account_id, 1)
+
     user = Map.put(user, :id, 2)
 
     assert_raise ExUnit.AssertionError, "expected the authenticated account to have a primary key value of: 2", fn ->
@@ -44,6 +53,9 @@ defmodule AuthTestSupportTest do
   test "assert_authenticated_as when not authenticated raises when account_type mismatch", %{conn: conn, admin: admin} do
     conn =
       conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
       |> Plug.Conn.put_session(:account_id, 1)
       |> Plug.Conn.put_session(:account_type, User)
 
@@ -57,6 +69,9 @@ defmodule AuthTestSupportTest do
   test "assert_authenticated_as does not raise when all conditions are met", %{conn: conn, user: user} do
     conn =
       conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
       |> Plug.Conn.put_session(:account_id, 1)
       |> Plug.Conn.put_session(:account_type, User)
 
@@ -64,21 +79,28 @@ defmodule AuthTestSupportTest do
     assert_authenticated_as(conn, user)
   end
 
-  test "authorize_as will authorize a session properly through the default pipeline", %{conn: conn, user: user}  do
+  test "authenticate_as will authenticate a session properly", %{conn: conn, user: user}  do
     user = Map.put(user, :id, 1)
 
-    authenticate_as(conn, user, Router)
+    authenticate_as(conn, user)
     |> assert_authenticated_as(user)
   end
 
-  test "authorize_as will authorize a session properly through a given pipeline", %{conn: conn, user: user} do
+  test "authenticate_as will authenticate with a specific endpoing", %{conn: conn, user: user}  do
+    user = Map.put(user, :id, 1)
+
+    authenticate_as(conn, user, @endpoint)
+    |> assert_authenticated_as(user)
+  end
+
+  test "authenticate_as will authenticate a session properly through a given pipeline", %{conn: conn, user: user} do
     user = Map.put(user, :id, 1)
 
     authenticate_as(conn, user, Router, :api)
     |> assert_authenticated_as(user)
   end
 
-  test "authorize_as will authorize a session properly through the given pipelines", %{conn: conn, user: user} do
+  test "authenticate_as will authenticate a session properly through the given pipelines", %{conn: conn, user: user} do
     user = Map.put(user, :id, 1)
 
     authenticate_as(conn, user, Router, [:other, :api])

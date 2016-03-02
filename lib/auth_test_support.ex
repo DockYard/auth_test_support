@@ -28,6 +28,22 @@ defmodule AuthTestSupport do
   whereas `sign_in/2` will step through the process of making the application API requests.
   """)
 
+  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate_as, 3}, (quote do: [conn, account, endpoint]),
+  """
+  Authenticate a `conn` for a specific account through a custom endpoint.
+
+  Similar to `authenticate_as/2` but you can controll which endpoint the authentication
+  is run through.
+  """)
+
+  Module.add_doc(__MODULE__, __ENV__.line + 1, :def, {:authenticate_as, 4}, (quote do: [conn, account, router, pipelines]),
+  """
+  Authenticate a `conn` for a specific account through a pipeline
+
+  Similar to `authenticate_as/2` but you can controll which router and pipeline the authentication
+  is run through.
+  """)
+
   @doc """
   Assert that the current connection is authenticated as a given account
 
@@ -73,14 +89,27 @@ defmodule AuthTestSupport do
       defoverridable [sign_in: 2]
 
       @doc false
-      def authenticate_as(conn, account, router, pipelines \\ [:browser])
+      def authenticate_as(conn, account),
+        do: authenticate_as(conn, account, @endpoint)
+      @doc false
+      def authenticate_as(conn, account, endpoint) do
+        {account_id, account_type} = AuthTestSupport.get_account_info(account)
+
+        conn
+        |> Phoenix.ConnTest.bypass_through()
+        |> endpoint.call(endpoint.init([]))
+        |> Phoenix.ConnTest.get("/")
+        |> Plug.Conn.fetch_session()
+        |> Plug.Conn.put_session(:account_id, account_id)
+        |> Plug.Conn.put_session(:account_type, account_type)
+      end
       def authenticate_as(conn, account, router, pipeline) when is_atom(pipeline),
         do: authenticate_as(conn, account, router, [pipeline])
       def authenticate_as(conn, account, router, pipelines) when is_list(pipelines) do
         {account_id, account_type} = AuthTestSupport.get_account_info(account)
 
         conn
-        |> Phoenix.ConnTest.bypass_through(router, List.wrap(pipelines))
+        |> Phoenix.ConnTest.bypass_through(router, pipelines)
         |> Phoenix.ConnTest.get("/")
         |> Plug.Conn.put_session(:account_id, account_id)
         |> Plug.Conn.put_session(:account_type, account_type)

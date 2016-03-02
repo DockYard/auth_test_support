@@ -66,5 +66,11 @@ Application.put_env(:auth_test_support, Endpoint, [secret_key_base: "foobar"])
 
 defmodule Endpoint do
   use Phoenix.Endpoint, otp_app: :auth_test_support
+
+  plug Plug.Session,
+    store: :cookie,
+    key: "_test",
+    signing_salt: "foobar"
+
   plug Router
 end
