@@ -107,6 +107,125 @@ defmodule AuthTestSupportTest do
     |> assert_authorized_as(user)
   end
 
+  test "refute_authorized_as does not raise when account_id is missing from session", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+
+    refute_authorized_as(conn, user)
+  end
+
+  test "refute_authorized_as does not raise when account_id mismatched with primary key value from `user`", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.put_session(:account_id, 2)
+
+    user = Map.put(user, :id, 1)
+
+    refute_authorized_as(conn, user)
+  end
+
+  test "refute_authorized_as does not raise when account_type is missing`", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.put_session(:account_id, 1)
+
+    user = Map.put(user, :id, 1)
+
+    refute_authorized_as(conn, user)
+  end
+
+  test "refute_authorized_as does not raise when account_type is mismatched`", %{conn: conn, admin: admin} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.put_session(:account_id, 1)
+      |> Plug.Conn.put_session(:account_type, User)
+
+    admin = Map.put(admin, :id, 1)
+
+    refute_authorized_as(conn, admin)
+  end
+
+  test "refute_authorized_as when account_id and account_type match raises", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.put_session(:account_id, 1)
+      |> Plug.Conn.put_session(:account_type, User)
+
+    user = Map.put(user, :id, 1)
+
+    assert_raise ExUnit.AssertionError, "expected not to be authorized as #{inspect user}", fn ->
+      refute_authorized_as(conn, user)
+    end 
+  end
+
+  test "refute_authorized_as when account is assigned in the session", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.assign(:account, user)
+
+    assert_raise ExUnit.AssertionError, "expected not to be authorized as #{inspect user}", fn ->
+      refute_authorized_as(conn, user)
+    end 
+  end
+
+  test "refute_authorized_as returns the conn", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+
+    result = refute_authorized_as(conn, user)
+    assert result == conn
+  end
+
+  test "refute_authorized_as :anyone will raise when account is assigned in the session", %{conn: conn, user: user} do
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.assign(:account, user)
+
+    assert_raise ExUnit.AssertionError, "expected not to be authorized, was as #{inspect user}", fn ->
+      refute_authorized_as(conn, :anyone)
+    end 
+  end
+
+  test "refute_authorized_as :anyone will raise when account_id and account_type are present in the session", %{conn: conn, user: user} do
+    user = Map.put(user, :id, 1)
+
+    conn =
+      conn
+      |> Phoenix.ConnTest.bypass_through()
+      |> @endpoint.call(@endpoint.init([]))
+      |> Plug.Conn.fetch_session()
+      |> Plug.Conn.put_session(:account_id, user.id)
+      |> Plug.Conn.put_session(:account_type, User)
+
+    assert_raise ExUnit.AssertionError, "expected not to be authorized, was with account_id: #{user.id} and account_type: #{inspect User}", fn ->
+      refute_authorized_as(conn, :anyone)
+    end 
+  end
+
   @doc """
   ## `require_authorization` tests
 
