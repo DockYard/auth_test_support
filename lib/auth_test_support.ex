@@ -64,6 +64,38 @@ defmodule AuthTestSupport do
   end
 
   @doc """
+  Refute account is authorized
+
+  Will refute that an account is currently authorized.
+
+  You can also pass `:anyone` as the account and this will refute that anyone is
+  authorized, not just a specific account.
+  """
+  def refute_authorized_as(conn, account)
+  def refute_authorized_as(%Plug.Conn{assigns: %{account: account}}, :anyone) do
+    ExUnit.Assertions.flunk "expected not to be authorized, was as #{inspect account}"
+  end
+  def refute_authorized_as(%Plug.Conn{assigns: %{account: account}}, account) do
+    ExUnit.Assertions.flunk "expected not to be authorized as #{inspect account}"
+  end
+  def refute_authorized_as(conn, :anyone) do
+    session_account_id = Plug.Conn.get_session(conn, :account_id)
+    session_account_type = Plug.Conn.get_session(conn, :account_type)
+
+    ExUnit.Assertions.refute session_account_id && session_account_type, "expected not to be authorized, was with account_id: #{inspect session_account_id} and account_type: #{inspect session_account_type}"
+  end
+  def refute_authorized_as(conn, account) do
+    {account_id, account_type} = get_account_info(account)
+
+    session_account_id = Plug.Conn.get_session(conn, :account_id)
+    session_account_type = Plug.Conn.get_session(conn, :account_type)
+
+    ExUnit.Assertions.refute session_account_id == account_id && session_account_type == account_type, "expected not to be authorized as #{inspect account}"
+
+    conn
+  end
+
+  @doc """
   Authorizes a connection with an account
 
   Equivalent to running:
