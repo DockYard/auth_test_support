@@ -15,7 +15,7 @@ defmodule AuthTestSupportTest do
 
   setup do
     conn =
-      Phoenix.ConnTest.conn(:get, "/")
+      Phoenix.ConnTest.build_conn(:get, "/")
 
     user = struct(User, %{})
     admin = struct(Admin, %{})
@@ -30,8 +30,11 @@ defmodule AuthTestSupportTest do
       |> @endpoint.call(@endpoint.init([]))
       |> Plug.Conn.fetch_session()
 
-    assert_raise ExUnit.AssertionError, "expected an account_id to be set", fn ->
+    try do
       assert_authorized_as(conn, user)
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message == "expected an account_id to be set"
     end
   end
 
@@ -45,9 +48,12 @@ defmodule AuthTestSupportTest do
 
     user = Map.put(user, :id, 2)
 
-    assert_raise ExUnit.AssertionError, "expected the authenticated account to have a primary key value of: 2", fn ->
+    try do
       assert_authorized_as(conn, user)
-    end 
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message == "expected the authenticated account to have a primary key value of: 2"
+    end
   end
 
   test "assert_authorized_as when not authenticated raises when account_type mismatch", %{conn: conn, admin: admin} do
@@ -61,8 +67,11 @@ defmodule AuthTestSupportTest do
 
     admin = Map.put(admin, :id, 1)
 
-    assert_raise ExUnit.AssertionError, "expected the authenticated account to be of type: Admin", fn ->
+    try do
       assert_authorized_as(conn, admin)
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message == "expected the authenticated account to be of type: Admin"
     end
   end
 
@@ -86,10 +95,13 @@ defmodule AuthTestSupportTest do
   end
 
   test "assert_authorized_as will raise when account is present in `conn.assigns` but doesn't match the challenge account", %{conn: conn, user: user} do
-    assert_raise ExUnit.AssertionError, "expected the account to match the assigned account in the session", fn ->
+    try do
       conn
       |> Plug.Conn.assign(:account, %{})
       |> assert_authorized_as(user)
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message =="expected the account to match the assigned account in the session"
     end
   end
 
@@ -168,9 +180,12 @@ defmodule AuthTestSupportTest do
 
     user = Map.put(user, :id, 1)
 
-    assert_raise ExUnit.AssertionError, "expected not to be authorized as #{inspect user}", fn ->
+    try do
       refute_authorized_as(conn, user)
-    end 
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message == "expected not to be authorized as #{inspect user}"
+    end
   end
 
   test "refute_authorized_as when account is assigned in the session", %{conn: conn, user: user} do
@@ -181,9 +196,12 @@ defmodule AuthTestSupportTest do
       |> Plug.Conn.fetch_session()
       |> Plug.Conn.assign(:account, user)
 
-    assert_raise ExUnit.AssertionError, "expected not to be authorized as #{inspect user}", fn ->
+    try do
       refute_authorized_as(conn, user)
-    end 
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message == "expected not to be authorized as #{inspect user}"
+    end
   end
 
   test "refute_authorized_as returns the conn", %{conn: conn, user: user} do
@@ -205,9 +223,12 @@ defmodule AuthTestSupportTest do
       |> Plug.Conn.fetch_session()
       |> Plug.Conn.assign(:account, user)
 
-    assert_raise ExUnit.AssertionError, "expected not to be authorized, was as #{inspect user}", fn ->
+    try do
       refute_authorized_as(conn, :anyone)
-    end 
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message == "expected not to be authorized, was as #{inspect user}"
+    end
   end
 
   test "refute_authorized_as :anyone will raise when account_id and account_type are present in the session", %{conn: conn, user: user} do
@@ -221,9 +242,12 @@ defmodule AuthTestSupportTest do
       |> Plug.Conn.put_session(:account_id, user.id)
       |> Plug.Conn.put_session(:account_type, User)
 
-    assert_raise ExUnit.AssertionError, "expected not to be authorized, was with account_id: #{user.id} and account_type: #{inspect User}", fn ->
+    try do
       refute_authorized_as(conn, :anyone)
-    end 
+    rescue
+      error in [ExUnit.AssertionError] ->
+        assert error.message == "expected not to be authorized, was with account_id: #{user.id} and account_type: #{inspect User}"
+    end
   end
 
   @doc """

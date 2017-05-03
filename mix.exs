@@ -9,7 +9,7 @@ defmodule AuthTestSupport.Mixfile do
      start_permanent: Mix.env == :prod,
      package: package(),
      description: description(),
-     deps: deps,
+     deps: deps(),
      docs: [
       main: "AuthTestSupport"
      ]]
@@ -42,10 +42,10 @@ defmodule AuthTestSupport.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:phoenix, "1.1.2", only: :test},
+    [{:phoenix, "1.2.0", only: :test},
      {:plug, "> 0.0.0"},
      {:earmark, "~> 0.1", only: :dev},
      {:ex_doc, "~> 0.11", only: :dev},
-     {:ecto, "1.1.4", only: :test}]
+     {:ecto, "2.1.0", only: :test}]
   end
 end
