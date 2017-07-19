@@ -1,9 +1,9 @@
-# AuthTestSupport
+# AuthTestSupport [![Build Status](https://secure.travis-ci.org/DockYard/auth_test_support.svg?branch=master)](http://travis-ci.org/DockYard/auth_test_support)
 
 A collection of common authentication / authorization test support
 function.
 
-[![Build Status](https://secure.travis-ci.org/DockYard/auth_test_support.svg?branch=master)](http://travis-ci.org/DockYard/auth_test_support)
+**[AuthTestSupport is built and maintained by DockYard, contact us for expert Elixir and Phoenix consulting](https://dockyard.com/phoenix-consulting)**.
 
 ## Installation ##
 
